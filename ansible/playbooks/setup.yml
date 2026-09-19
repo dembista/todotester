@@ -1,0 +1,48 @@
+---
+- name: Provisionnement complet de l'infrastructure (Docker, Traefik, Sonarqube, Prometheus, Grafana, monitoring)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Inclure le rôle docker
+      ansible.builtin.import_role:
+        name: docker
+    - name: Inclure le rôle traefik
+      ansible.builtin.import_role:
+        name: traefik
+    - name: Inclure le rôle sonarqube
+      ansible.builtin.import_role:
+        name: sonarqube
+    - name: Inclure le rôle node_exporter (métriques serveur + état conteneurs)
+      ansible.builtin.import_role:
+        name: node_exporter
+    - name: Inclure le rôle cadvisor (métriques conteneurs)
+      ansible.builtin.import_role:
+        name: cadvisor
+    - name: Inclure le rôle trivy (scan des failles)
+      ansible.builtin.import_role:
+        name: trivy
+    - name: Inclure le rôle prometheus
+      ansible.builtin.import_role:
+        name: prometheus
+    - name: Inclure le rôle grafana
+      ansible.builtin.import_role:
+        name: grafana
+    - name: Inclure le rôle duckdns (maj IP sur le domaine)
+      ansible.builtin.import_role:
+        name: duckdns
+
+    - name: Afficher le résumé de l'installation
+      ansible.builtin.debug:
+        msg:
+          - "Outils installés sur {{ inventory_hostname }} :"
+          - "  Docker (+ compose plugin) + métriques daemon (9323)"
+          - "  Traefik (port 80/443)"
+          - "  Sonarqube (port 9000) + PostgreSQL"
+          - "  node_exporter (9100) + exporteur d'état des conteneurs"
+          - "  cAdvisor (8080, métriques conteneurs)"
+          - "  Trivy (scan de failles quotidien)"
+          - "  Prometheus (9090) + fichier d'alertes"
+          - "  Grafana (3000) + dashboards provisionnés"
+          - "  DuckDNS (cron de mise à jour de l'IP) si duckdns_token renseigné"

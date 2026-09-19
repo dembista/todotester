@@ -1,0 +1,4 @@
+---
+- name: Relancer cAdvisor
+  ansible.builtin.command: docker compose -f /opt/cadvisor/docker-compose.yml up -d --force-recreate
+  ignore_errors: true

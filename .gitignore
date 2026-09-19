@@ -1,0 +1,32 @@
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+terraform/crash.log
+terraform/override.tf
+terraform/override.tf.json
+
+# Clés SSH (ne JAMAIS committer)
+*.pem
+todo-app.pem
+*.key
+*.crt
+
+# Ansible
+ansible/collections/
+ansible/inventory/group_vars/vault.yml
+.vault-pass
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environnement
+.env
+*.env
+
+# Divers
+.DS_Store
+Thumbs.db
+*.log

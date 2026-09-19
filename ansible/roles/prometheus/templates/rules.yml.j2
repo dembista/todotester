@@ -1,0 +1,161 @@
+# Fichier d'alertes Prometheus — todotester
+# Couvre : état des conteneurs, état du serveur (CPU/RAM/disque/charge),
+# failles (Trivy), redondances (services critiques), app, Traefik, Docker daemon.
+#
+# Visualisation dans Grafana (Alerting → Alert rules) — dashboard "Alertes & Failles".
+
+groups:
+  - name: service_status
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cible {{ $labels.instance }} arrêtée"
+          description: "Le job {{ $labels.job }} (instance {{ $labels.instance }}) ne répond plus depuis {{ $value }}."
+          grafana_folder: "Statut des services"
+
+      - alert: DockerDaemonDown
+        expr: up{job="docker-daemon"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Daemon Docker injoignable"
+          description: "Les métriques du daemon Docker ({{ $labels.instance }}) sont indisponibles."
+
+      - alert: AppTodoInjoignable
+        expr: up{job="todo-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application todo-app injoignable"
+          description: "L'application todo-app ({{ $labels.instance }}) ne répond plus sur /api/health."
+
+  - name: server_health
+    rules:
+      - alert: HostHighCpuLoad
+        expr: (100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > {{ alert_cpu_threshold | default(85) }}
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU serveur > {{ alert_cpu_threshold | default(85) }}% ({{ $labels.instance }})"
+          description: "L'utilisation CPU de {{ $labels.instance }} est à {{ $value | humanizePercentage }} depuis 10 minutes."
+
+      - alert: HostHighMemoryUsage
+        expr: (1 - (node_memory_Available_bytes / node_memory_MemTotal_bytes)) * 100 > {{ alert_mem_threshold | default(90) }}
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mémoire serveur > {{ alert_mem_threshold | default(90) }}% ({{ $labels.instance }})"
+          description: "La mémoire de {{ $labels.instance }} est pleine à {{ $value | humanizePercentage }}."
+
+      - alert: HostHighDiskSpaceUsage
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > {{ alert_disk_threshold | default(90) }}
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disque racine > {{ alert_disk_threshold | default(90) }}% ({{ $labels.instance }})"
+          description: "L'espace disque de {{ $labels.instance }} est utilisé à {{ $value | humanizePercentage }}. SonarQube/Prometheus consomment beaucoup — pensez à augmenter volume_size."
+
+      - alert: HostHighLoadAverage
+        expr: node_load1 / count(node_cpu_seconds_total{mode="idle"}) by (instance) > {{ alert_load_threshold | default(4) }}
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Charge serveur élevée ({{ $labels.instance }})"
+          description: "Le load average 1min ({{ $value }}) dépasse {{ alert_load_threshold | default(4) }}x le nombre de cœurs."
+
+  - name: containers_redundancy
+    rules:
+      - alert: ContainerCritiqueArrete
+        expr: docker_expected_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Conteneur critique arrêté : {{ $labels.name }}"
+          description: "Le conteneur indispensable {{ $labels.name }} n'est plus en cours d'exécution. Redondance dégradée."
+
+      - alert: ContainerRedemarragesFrequents
+        expr: increase(docker_container_restarts[10m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redémarrages en boucle : {{ $labels.name }}"
+          description: "Le conteneur {{ $labels.name }} a redémarré {{ $value }} fois en 10 minutes."
+
+      - alert: ContainerNonHealthy
+        expr: docker_container_health == 0 and docker_container_up == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Conteneur unhealthy : {{ $labels.name }}"
+          description: "Le healthcheck du conteneur {{ $labels.name }} échoue."
+
+      - alert: RedondanceDegradee
+        expr: docker_running_containers < sum(docker_expected_up)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redondance dégradée ({{ $value }} conteneurs en cours vs requis)"
+          description: "Le nombre de conteneurs en cours d'exécution est inférieur au nombre de services critiques attendus."
+
+  - name: vulnerabilities
+    rules:
+      - alert: FailleCritiqueTrouvee
+        expr: trivy_vulnerabilities_total{severity="CRITICAL"} > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Faille CRITIQUE détectée sur {{ $labels.image }}"
+          description: "Trivy a trouvé {{ $value }} vulnérabilité(s) CRITICAL sur l'image {{ $labels.image }} (scan quotidien)."
+
+      - alert: FailleHauteTrouvee
+        expr: trivy_vulnerabilities_total{severity="HIGH"} > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Faille(s) HIGH sur {{ $labels.image }}"
+          description: "Trivy a trouvé {{ $value }} vulnérabilité(s) HIGH sur l'image {{ $labels.image }}."
+
+      - alert: ScanFaillesEchoue
+        expr: trivy_scan_success == 0
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scan des failles en échec ({{ $labels.image }})"
+          description: "Le scan Trivy de l'image {{ $labels.image }} n'a pas abouti."
+
+  - name: traefik
+    rules:
+      - alert: TraefikTauxErreurs5xx
+        expr: (sum(rate(traefik_router_requests_total{code=~"5.."}[5m]) by (router)) / clamp_min(sum(rate(traefik_router_requests_total[5m]) by (router)), 1)) * 100 > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Erreurs 5xx Traefik élevées ({{ $labels.router }})"
+          description: "Plus de 10% de réponses 5xx sur {{ $labels.router }} depuis 10 minutes."
+
+      - alert: TraefikCertProcheExpiration
+        expr: traefik_certificate_ttl_seconds < 86400 * {{ alert_cert_expiry_days | default(7) }}
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificat TLS {{ $labels.domain }} expire dans moins de {{ alert_cert_expiry_days | default(7) }} jours"
+          description: "Le certificat Let's Encrypt de {{ $labels.domain }} expire dans {{ $value | humanizeDuration }}."

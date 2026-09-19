@@ -1,0 +1,40 @@
+---
+- name: Création des répertoires Trivy
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/trivy
+    - /opt/trivy/cache
+    - /opt/trivy/flags
+
+- name: Liste des images à scanner (contrôle + app)
+  ansible.builtin.copy:
+    content: "{{ trivy_images | join('\n') }}\n"
+    dest: /opt/trivy/images.list
+    mode: "0644"
+
+- name: Services critiques attendus (contrôle de redondance)
+  ansible.builtin.copy:
+    content: "{{ critical_services | join(' ') }}"
+    dest: /opt/trivy/flags/expected_services
+    mode: "0644"
+
+- name: Copie du script de scan des failles (Trivy)
+  ansible.builtin.copy:
+    src: trivy-scan.sh
+    dest: /usr/local/bin/trivy-scan.sh
+    mode: "0755"
+
+- name: Scan des failles chaque nuit à 03h00
+  ansible.builtin.cron:
+    name: "trivy-vulnerability-scan"
+    minute: "0"
+    hour: "3"
+    job: "/usr/local/bin/trivy-scan.sh >/dev/null 2>&1"
+
+- name: Exécution d'un premier scan immédiat (idempotent)
+  ansible.builtin.command: /usr/local/bin/trivy-scan.sh
+  register: trivy_first_run
+  changed_when: trivy_first_run.rc == 0

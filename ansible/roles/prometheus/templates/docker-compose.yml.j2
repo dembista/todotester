@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.external-url={{ prometheus_path if domain_name else prometheus_path }}"
+      - "--web.route-prefix={{ prometheus_path }}"
+    volumes:
+      - /opt/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /opt/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+      - /opt/prometheus/data:/prometheus
+    networks:
+      - traefik
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  traefik:
+    external: true

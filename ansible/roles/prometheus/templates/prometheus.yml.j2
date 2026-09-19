@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Fichier de règles d'alertes (état des conteneurs, serveur, failles, redondances)
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "traefik"
+    static_configs:
+      - targets: ["traefik:8080"]
+
+  - job_name: "node"                 # métriques hôte : CPU, RAM, disque, réseau, charge
+    static_configs:
+      - targets: ["node_exporter:9100"]
+
+  - job_name: "cadvisor"             # métriques conteneurs : CPU/mémoire par conteneur
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: "docker-daemon"        # métriques du daemon Docker (port 9323)
+    static_configs:
+      - targets: ["host.docker.internal:9323"]
+
+  - job_name: "todo-app"             # santé de l'application (up = 1 si /api/health répond)
+    metrics_path: /api/health
+    static_configs:
+      - targets: ["todo-app:3000"]

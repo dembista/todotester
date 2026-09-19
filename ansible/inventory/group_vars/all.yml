@@ -1,0 +1,87 @@
+---
+# Variables communes à tous les environnements
+
+# Image Docker de l'application (Docker Hub) - surchargée par le CI/CD
+app_image: demba087/todo-app:latest
+app_name: todo-app
+app_port: "3000"
+
+# Réseau Docker partagé avec Traefik
+traefik_network: traefik
+
+# ---------------------------------------------------------------
+# Domaine public
+#   - DuckDNS gratuit : vous ne pouvez PAS créer de sous-domaines
+#     (ex: grafana.madakhoun.duckdns.org). On route donc les outils
+#     par chemins sur le domaine unique : /grafana, /sonarqube,
+#     /prometheus, /dashboard.
+#   - Si vous possédez un domaine avec wildcard / sous-domaines DNS,
+#     mettez domain_wildcard_subdomains: true pour l'ancien mode.
+# ---------------------------------------------------------------
+domain_name: ""
+domain_wildcard_subdomains: false
+
+app_host: "{{ domain_name if domain_name else 'todo-app.local' }}"
+traefik_dashboard_host: "{{ 'traefik.' ~ domain_name if domain_name else 'traefik.local' }}"
+
+# Chemins publics des outils (mode chemin, DuckDNS)
+grafana_path: /grafana
+sonarqube_path: /sonarqube
+prometheus_path: /prometheus
+traefik_dashboard_path: /dashboard
+
+# URL publiques des outils
+grafana_public_url: "{{ ('https://' ~ domain_name) if domain_name else 'http://localhost:3000' }}{{ (grafana_path ~ '/') if not domain_wildcard_subdomains and domain_name else '' }}"
+grafana_serve_from_sub_path: "{{ (not domain_wildcard_subdomains) and domain_name | length > 0 }}"
+sonarqube_web_context: "{{ sonarqube_path if not domain_wildcard_subdomains and domain_name else '/' }}"
+
+# Email utilisé par Let's Encrypt (ACME contact)
+traefik_acme_email: dembista@users.noreply.github.com
+
+# ---------------------------------------------------------------
+# Monitoring
+# ---------------------------------------------------------------
+node_exporter_dir: /opt/node_exporter
+
+# Services critiques attendus (contrôle de redondance)
+critical_services:
+  - traefik
+  - prometheus
+  - grafana
+  - todo-app
+  - node_exporter
+  - cadvisor
+
+# Images scannées à la recherche de failles (Trivy, chaque nuit)
+trivy_images:
+  - demba087/todo-app:main
+  - traefik:v3.6
+  - prom/prometheus:v2.51.0
+  - grafana/grafana:11.0.0
+  - sonarqube:lts-community
+  - postgres:16
+
+# Seuils d'alertes Prometheus (surchargeables)
+alert_cpu_threshold: 85
+alert_mem_threshold: 90
+alert_disk_threshold: 90
+alert_load_threshold: 4
+alert_cert_expiry_days: 7
+
+# Grafana
+grafana_admin_user: admin
+grafana_admin_password: "change-me-strong-password"
+# Webhook de notification des alertes (laisser vide = contact point inerte)
+grafana_webhook_url: ""
+
+# ---------------------------------------------------------------
+# DuckDNS : mise à jour automatique de l'IP (optionnel, vide = désactivé)
+#   duckdns_token  -> valeur depuis votre compte https://www.duckdns.org
+#   duckdns_domains -> sous-domaine(s), séparés par des virgules (ex. "madakhoun")
+# ---------------------------------------------------------------
+duckdns_token: ""
+duckdns_domains: "madakhoun"
+
+# Base de données Neon (PostgreSQL managé).
+# L'URL est injectée par le CI/CD (secret DATABASE_URL) ; laisser vide ici.
+app_database_url: ""

@@ -1,0 +1,37 @@
+---
+- name: Création des répertoires node_exporter
+  ansible.builtin.file:
+    path: "{{ node_exporter_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Répertoire des métriques texte (textfile collector)
+  ansible.builtin.file:
+    path: "{{ node_exporter_dir }}/textfile"
+    state: directory
+    mode: "0755"
+
+- name: Copie de l'exporteur d'état des conteneurs Docker
+  ansible.builtin.copy:
+    src: containers-exporter.sh
+    dest: /usr/local/bin/containers-exporter.sh
+    mode: "0755"
+  notify: Relancer node_exporter
+
+- name: Planifier la collecte de l'état des conteneurs (toutes les minutes)
+  ansible.builtin.cron:
+    name: "containers-exporter"
+    minute: "*"
+    job: "/usr/local/bin/containers-exporter.sh >/dev/null 2>&1"
+
+- name: Copie du docker-compose node_exporter
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ node_exporter_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: Relancer node_exporter
+
+- name: Démarrage de node_exporter
+  ansible.builtin.command: docker compose -f {{ node_exporter_dir }}/docker-compose.yml up -d
+  register: node_exporter_result
+  changed_when: node_exporter_result.rc == 0

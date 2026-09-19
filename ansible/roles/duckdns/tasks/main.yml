@@ -1,0 +1,19 @@
+---
+- name: DuckDNS - script de mise à jour de l'adresse IP
+  ansible.builtin.template:
+    src: duckdns-update.sh.j2
+    dest: /usr/local/bin/duckdns-update.sh
+    mode: "0755"
+  when: duckdns_token | length > 0 and duckdns_domains | length > 0
+
+- name: DuckDNS - planifier la mise à jour toutes les 10 minutes
+  ansible.builtin.cron:
+    name: "duckdns-update"
+    minute: "*/10"
+    job: "/usr/local/bin/duckdns-update.sh >/dev/null 2>&1"
+  when: duckdns_token | length > 0 and duckdns_domains | length > 0
+
+- name: DuckDNS - avertir si non configuré
+  ansible.builtin.debug:
+    msg: "DuckDNS désactivé : renseignez duckdns_token et duckdns_domains (ansible/inventory/group_vars/all.yml + vault)"
+  when: duckdns_token | length == 0 or duckdns_domains | length == 0

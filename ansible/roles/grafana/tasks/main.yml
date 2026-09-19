@@ -1,0 +1,67 @@
+---
+- name: Création des répertoires Grafana
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/grafana
+    - /opt/grafana/data
+    - /opt/grafana/provisioning/datasources
+    - /opt/grafana/provisioning/dashboards
+    - /opt/grafana/provisioning/alerting
+
+- name: Permissions du dossier de données (uid 472 = utilisateur du conteneur)
+  ansible.builtin.file:
+    path: /opt/grafana/data
+    state: directory
+    owner: "472"
+    group: "472"
+    mode: "0755"
+
+- name: Copie de la datasource Prometheus pour Grafana
+  ansible.builtin.copy:
+    src: prometheus-datasource.yml
+    dest: /opt/grafana/provisioning/datasources/prometheus.yml
+    mode: "0644"
+  notify: Relancer Grafana
+
+- name: Copie des dashboards provisionnés
+  ansible.builtin.copy:
+    src: "dashboards/"
+    dest: /opt/grafana/provisioning/dashboards/
+    mode: "0644"
+  notify: Relancer Grafana
+
+- name: Copie de la configuration du provider de dashboards
+  ansible.builtin.copy:
+    src: dashboards.yml
+    dest: /opt/grafana/provisioning/dashboards/dashboards.yml
+    mode: "0644"
+  notify: Relancer Grafana
+
+- name: Copie du contact point d'alertes (webhook)
+  ansible.builtin.template:
+    src: contactpoints.yml.j2
+    dest: /opt/grafana/provisioning/alerting/contactpoints.yml
+    mode: "0644"
+  notify: Relancer Grafana
+
+- name: Copie de la politique de notification (régroupement / répétition)
+  ansible.builtin.copy:
+    src: notificationpolicies.yml
+    dest: /opt/grafana/provisioning/alerting/notificationpolicies.yml
+    mode: "0644"
+  notify: Relancer Grafana
+
+- name: Copie du docker-compose Grafana
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/grafana/docker-compose.yml
+    mode: "0644"
+  notify: Relancer Grafana
+
+- name: Démarrage de Grafana
+  ansible.builtin.command: docker compose -f /opt/grafana/docker-compose.yml up -d
+  register: grafana_result
+  changed_when: grafana_result.rc == 0

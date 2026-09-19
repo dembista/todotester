@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Met à jour l'adresse IP publique des sous-domaines DuckDNS.
+# Nécessite : duckdns_token + duckdns_domains (variables Ansible).
+set -uo pipefail
+
+TOKEN="{{ duckdns_token }}"
+DOMAINS="{{ duckdns_domains }}"
+
+IP=$(curl -fsS "https://api.ipify.org" 2>/dev/null)
+
+curl -fsS "https://www.duckdns.org/update?domains=${DOMAINS}&token=${TOKEN}&ip=${IP}" >/dev/null 2>&1
+
+echo "[duckdns] $(date -Is) $DOMAINS -> $IP" >> /var/log/duckdns-update.log

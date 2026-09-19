@@ -1,0 +1,4 @@
+---
+- name: Relancer node_exporter
+  ansible.builtin.command: docker compose -f {{ node_exporter_dir }}/docker-compose.yml up -d --force-recreate
+  ignore_errors: true

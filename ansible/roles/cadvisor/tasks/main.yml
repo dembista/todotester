@@ -1,0 +1,22 @@
+---
+- name: "{{ ansible_system }}: options de montage cAdvisor"
+  ansible.builtin.set_fact:
+    cadvisor_volume_options: "{{ 'rw,rshared' if ansible_system == 'Linux' else 'rw' }}"
+
+- name: Création du répertoire cAdvisor
+  ansible.builtin.file:
+    path: /opt/cadvisor
+    state: directory
+    mode: "0755"
+
+- name: Copie du docker-compose cAdvisor
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/cadvisor/docker-compose.yml
+    mode: "0644"
+  notify: Relancer cAdvisor
+
+- name: Démarrage de cAdvisor
+  ansible.builtin.command: docker compose -f /opt/cadvisor/docker-compose.yml up -d
+  register: cadvisor_result
+  changed_when: cadvisor_result.rc == 0

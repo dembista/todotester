@@ -1,0 +1,5 @@
+---
+# Variables spécifiques à l'environnement prod
+# Domaine DuckDNS unique (les outils sont routés par chemins : /grafana, /sonarqube…)
+domain_name: "madakhoun.duckdns.org"
+# domain_wildcard_subdomains: true  # si vous pouvez créer des sous-domaines DNS
